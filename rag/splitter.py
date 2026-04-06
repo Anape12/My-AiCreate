@@ -1,0 +1,4 @@
+CharacterTextSplitter(
+    chunk_size=200,
+    chunk_overlap=50
+)
