@@ -9,6 +9,13 @@ from langchain_text_splitters import CharacterTextSplitter
 
 from rag.vectorstore import VectorStore
 from rag.retriever import Retriever
+from rag.quick_answers import get_quick_answer
+from rag.external_llm import ExternalLLMClient
+from rag.prompt_builder import build_prompt
+from rag.query_guard import normalize_query
+from rag.knowledge_loader import KnowledgeLoader
+from rag.answer_guard import refine_answer
+from rag.calculator import calculate
 
 from tools.tools import TOOLS
 from agent.react_agent import ReactAgent
@@ -18,6 +25,10 @@ app = FastAPI()
 
 llm = OllamaLLM(model="mistral")
 agent = ReactAgent(llm, TOOLS)
+external_llm = ExternalLLMClient()
+
+# 初期化コストの高い処理は起動時に1回だけ行う
+# ここでは必要に応じて後で差し替え可能にしておく
 
 # CORS
 app.add_middleware(
@@ -31,10 +42,11 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ===== RAG =====
-docs = ["if文は条件分岐する構文"]
+knowledge_loader = KnowledgeLoader("data/knowledge.txt")
+raw_knowledge = knowledge_loader.load()
 
 splitter = CharacterTextSplitter(chunk_size=300, chunk_overlap=50)
-documents = splitter.create_documents(docs)
+documents = splitter.create_documents(raw_knowledge)
 
 vs = VectorStore()
 vs.build(documents)
@@ -67,8 +79,22 @@ def chat_stream(req: ChatRequest):
             [f"{h['role']}: {h['content']}" for h in chat_history]
         )
 
+        quick_answer = get_quick_answer(req.query)
+        if quick_answer is not None:
+            yield quick_answer
+            chat_history.append({"role": "assistant", "content": quick_answer})
+            return
+
+        calc_result = calculate(req.query)
+        if calc_result is not None:
+            answer = f"{calc_result}円です。"
+            yield answer
+            chat_history.append({"role": "assistant", "content": answer})
+            return
+
         # ===== ReAct =====
-        react_context = agent.run(req.query)
+        # 追加のLLMラウンドトリップを避け、1回の生成に集約する
+        react_context = ""
 
         # ===== RAG =====
         docs = retriever.retrieve(req.query)
@@ -77,33 +103,33 @@ def chat_stream(req: ChatRequest):
         if docs:
             rag_context = "\n".join([doc.page_content for doc in docs])
 
+        normalized_query = normalize_query(req.query)
+
         # ===== 最終プロンプト =====
-        prompt = f"""
-あなたは優秀なAIアシスタントです。
-
-# ルール
-- ツール結果を優先
-- 推測禁止
-- 分からない場合は「分かりません」
-
-# 会話履歴
-{history_text}
-
-# エージェント情報
-{react_context}
-
-# 参考情報
-{rag_context}
-
-# 質問
-{req.query}
-"""
+        prompt = build_prompt(
+            query=normalized_query,
+            history_text=history_text,
+            react_context=react_context,
+            rag_context=rag_context,
+        )
 
         full = ""
 
-        for chunk in llm.stream(prompt):
-            full += chunk
-            yield chunk
+        try:
+            if external_llm.api_key:
+                full = external_llm.generate(prompt)
+                full = refine_answer(full, rag_context)
+                yield full
+            else:
+                for chunk in llm.stream(prompt):
+                    full += chunk
+                    yield chunk
+                full = refine_answer(full, rag_context)
+        except Exception:
+            for chunk in llm.stream(prompt):
+                full += chunk
+                yield chunk
+            full = refine_answer(full, rag_context)
 
         chat_history.append({"role": "assistant", "content": full})
 
