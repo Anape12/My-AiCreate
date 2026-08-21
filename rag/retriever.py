@@ -9,7 +9,7 @@ class Retriever:
 
         filtered = []
         for doc, score in results:
-            if score < self.threshold:
+            if score >= self.threshold:
                 filtered.append(doc)
 
         return filtered

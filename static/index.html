@@ -75,6 +75,18 @@ button {
   color: white;
   border-radius: 5px;
 }
+
+.feedback {
+  margin-top: 8px;
+}
+
+.feedback button {
+  background: transparent;
+  border: 1px solid #777;
+  margin-left: 0;
+  margin-right: 6px;
+  padding: 4px 8px;
+}
 </style>
 </head>
 
@@ -92,6 +104,8 @@ button {
 
 <script>
 let isLoading = false;
+
+fetch("http://localhost:8000/models/warmup", {method: "POST"}).catch(() => {});
 
 async function send() {
   if (isLoading) return;
@@ -116,6 +130,7 @@ async function send() {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({query})
     });
+    const experienceId = res.headers.get("X-Experience-ID");
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder("utf-8");
@@ -132,6 +147,7 @@ async function send() {
       const chat = document.getElementById("chat");
       chat.scrollTop = chat.scrollHeight;
     }
+    if (experienceId) addFeedback(msgId, experienceId);
 
   } catch (e) {
     updateMessage(msgId, "エラーが発生しました");
@@ -171,6 +187,33 @@ function addMessage(role, text) {
 function updateMessage(id, text) {
   const el = document.querySelector(`[data-id="${id}"]`);
   if (el) el.textContent = text;
+}
+
+function addFeedback(messageId, experienceId) {
+  const bubble = document.querySelector(`[data-id="${messageId}"]`);
+  if (!bubble) return;
+
+  const controls = document.createElement("div");
+  controls.className = "feedback";
+  controls.innerHTML = '<button title="Use for learning">👍</button><button title="Do not use for learning">👎</button>';
+  const [approve, reject] = controls.querySelectorAll("button");
+  approve.onclick = () => reviewExperience(experienceId, "approved", 5, controls);
+  reject.onclick = () => reviewExperience(experienceId, "rejected", 1, controls);
+  bubble.parentElement.appendChild(controls);
+}
+
+async function reviewExperience(experienceId, status, score, controls) {
+  try {
+    const response = await fetch(`http://localhost:8000/experiences/${experienceId}/review`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({status, score})
+    });
+    if (!response.ok) throw new Error("review failed");
+    controls.textContent = status === "approved" ? "Saved as a learning example." : "Excluded from learning.";
+  } catch (error) {
+    controls.textContent = "Could not save feedback.";
+  }
 }
 
 /* Enter送信 */

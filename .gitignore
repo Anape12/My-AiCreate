@@ -201,6 +201,12 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Generated local AI memory and fine-tuning datasets
+data/experiences.jsonl
+data/training/
+data/models.json
+data/sourced_knowledge.jsonl
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
