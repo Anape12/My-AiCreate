@@ -51,27 +51,50 @@ Previous tool results: {context}
             actions.append("export_training_data")
         if any(word in query.lower() for word in ("検索", "調べて", "search")) and "web_search" in self.registry.names():
             actions.append("web_search")
-        return actions
+        high_stakes_terms = (
+            "眠", "睡眠", "不眠", "体調", "症状", "痛み", "薬", "病気",
+            "診断", "法律", "契約", "税金", "投資", "ローン",
+        )
+        if any(word in query for word in high_stakes_terms) and "web_search" in self.registry.names():
+            actions.append("web_search")
+        return list(dict.fromkeys(actions))
 
     def run(self, query: str, max_steps: int = 3) -> str:
         return self.run_with_trace(query, max_steps).context
 
     def run_with_trace(self, query: str, max_steps: int = 3, experience_context: str = "") -> PlanResult:
+        """Use deterministic routing first; reserve LLM planning for complex requests."""
         context = ""
         executed: set[str] = set()
         action_trace: list[str] = []
-        for _ in range(max_steps):
-            try:
-                actions = self._parse_actions(self.llm.invoke(self._prompt(query, experience_context + "\n" + context)))
-            except Exception:
-                actions = []
-            if not actions:
-                actions = self._fallback_actions(query) if not context else []
+
+        def execute(actions: list[str]) -> None:
+            nonlocal context
             actions = [action for action in actions if action not in executed]
             if not actions:
-                break
+                return
             results = [f"[{name}]\n{self.registry.execute(name, query)}" for name in actions]
             executed.update(actions)
             action_trace.extend(actions)
             context = "\n\n".join([context, *results]).strip()
+
+        fast_actions = self._fallback_actions(query)
+        if fast_actions:
+            execute(fast_actions)
+            # Weather + transit + web requests benefit from one additional planning pass.
+            online_actions = {"weather", "train", "web_search"} & set(fast_actions)
+            if len(online_actions) < 2:
+                return PlanResult(context=context, actions=action_trace)
+
+        # An LLM plan is only needed for a multi-source request or an unknown custom tool.
+        for _ in range(1 if fast_actions else min(max_steps, 1)):
+            try:
+                actions = self._parse_actions(self.llm.invoke(self._prompt(query, experience_context + "\n" + context)))
+            except Exception:
+                actions = []
+            if not actions and not context:
+                actions = fast_actions
+            if not actions:
+                break
+            execute(actions)
         return PlanResult(context=context, actions=action_trace)

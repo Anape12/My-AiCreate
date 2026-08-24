@@ -12,8 +12,8 @@ class PromptBuilderTests(unittest.TestCase):
             rag_context="",
         )
 
-        self.assertIn("業務システム・運用・設計・実装", prompt)
-        self.assertIn("実務的で具体的な回答", prompt)
+        self.assertIn("親しみやすい会話調", prompt)
+        self.assertIn("相談では、決めつけや説教をせず", prompt)
 
 
 if __name__ == "__main__":
