@@ -35,7 +35,7 @@ class AIService:
         self.experience_memory = ExperienceMemory(project_root / "data" / "experiences.jsonl")
         self.sourced_knowledge_memory = SourcedKnowledgeMemory(project_root / "data" / "sourced_knowledge.jsonl")
         self.model_registry = ModelRegistry(project_root / "data" / "models.json")
-        self.model_name = self.model_registry.active_runtime_model() or os.getenv("OLLAMA_MODEL", "mistral")
+        self.model_name = self.model_registry.active_runtime_model() or os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
         self.llm = create_llm_provider(self.model_name)
         self.evaluation_gate = EvaluationGate()
         self.registry, self.knowledge_memory = self._build_registry()

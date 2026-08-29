@@ -16,7 +16,17 @@ class OllamaProvider(LLMProvider):
         if self.keep_alive == "-1":
             self.keep_alive = "-1m"
         self.host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
-        self._client = OllamaLLM(model=model_name, keep_alive=self.keep_alive)
+        self.num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
+        self.num_predict = int(os.getenv("OLLAMA_NUM_PREDICT", "180"))
+        self.temperature = float(os.getenv("OLLAMA_TEMPERATURE", "0.7"))
+        self._client = OllamaLLM(
+            model=model_name,
+            keep_alive=self.keep_alive,
+            base_url=self.host,
+            num_ctx=self.num_ctx,
+            num_predict=self.num_predict,
+            temperature=self.temperature,
+        )
 
     def invoke(self, prompt: str) -> str:
         return self._client.invoke(prompt)
