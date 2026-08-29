@@ -17,3 +17,7 @@ class LLMProvider(ABC):
 
     def warmup(self) -> None:
         """Optionally load the model before the first user request."""
+
+    def invoke_chat(self, system_prompt: str, user_prompt: str) -> str:
+        """Generate a chat response; providers may override this with native role support."""
+        return self.invoke(f"{system_prompt}\n\n{user_prompt}")

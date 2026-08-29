@@ -78,24 +78,23 @@ class CharacterConversationService:
         _, provider, lock = self._provider(model_name)
         tool_context = self._tool_context(message)
         character_prompt = self.prompts.load(prompt_key, conversation_type)
-        prompt = f"""<system>
-{character_prompt}
-</system>
+        user_prompt = f"""以下の会話履歴は、今回の発言を理解するための補助情報です。
+履歴に別の話題があっても、必ず「今回の発言」の内容に対して返答してください。
 
-<conversation type="{conversation_type}">
+<conversation_history type="{conversation_type}">
 {(context or '')[-3000:]}
-</conversation>
+</conversation_history>
 
-<latest_user_message>
+<current_user_message>
 {message}
-</latest_user_message>
+</current_user_message>
 
 <tool_result>
 {tool_context or 'なし'}
 </tool_result>
 
-「{character_name}」の返答本文だけを出力してください。"""
+今回の発言にかみ合う「{character_name}」の返答本文だけを出力してください。"""
         # Ollama clients are reused; serialize calls per model to keep local inference stable.
         with lock:
-            answer = provider.invoke(prompt)
+            answer = provider.invoke_chat(character_prompt, user_prompt)
         return self._naturalize_answer(answer, character_name, message)
