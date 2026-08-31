@@ -40,3 +40,7 @@ class ModelRegistry:
         if not name:
             return None
         return data["models"][name].get("artifact") or name
+
+    def models(self) -> dict:
+        """Return registered models without exposing the registry's mutable data."""
+        return self._read().get("models", {}).copy()

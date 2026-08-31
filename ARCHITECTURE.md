@@ -26,6 +26,10 @@ FastAPI (app.py)
 ## LLM providers
 
 - `LLM_PROVIDER=ollama` (default) uses the local Ollama runtime and `OLLAMA_MODEL`.
+- The default general-purpose model is `qwen2.5:7b`; an activated model in the
+  local registry takes priority over that default or `OLLAMA_MODEL`.
+- `POST /models/select` health-checks and activates an installed local model at
+  runtime.  This keeps model changes out of the chat/API layer.
 - `LLM_PROVIDER=external` uses the existing OpenAI-compatible external endpoint settings.
 - Learning, evaluation, and the model registry do not depend on either provider.
 

@@ -35,7 +35,9 @@ class AIService:
         self.experience_memory = ExperienceMemory(project_root / "data" / "experiences.jsonl")
         self.sourced_knowledge_memory = SourcedKnowledgeMemory(project_root / "data" / "sourced_knowledge.jsonl")
         self.model_registry = ModelRegistry(project_root / "data" / "models.json")
-        self.model_name = self.model_registry.active_runtime_model() or os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
+        # Qwen 2.5 7B is the general-purpose default.  A promoted local model
+        # still takes priority, followed by an explicit environment override.
+        self.model_name = self.model_registry.active_runtime_model() or os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
         self.llm = create_llm_provider(self.model_name)
         self.evaluation_gate = EvaluationGate()
         self.registry, self.knowledge_memory = self._build_registry()
@@ -68,6 +70,36 @@ class AIService:
 
     def warmup(self) -> None:
         self.llm.warmup()
+
+    def select_model(self, model_name: str) -> str:
+        """Validate, persist, and immediately start using a local runtime model.
+
+        The candidate is warmed up before changing the active pointer, so a
+        misspelled or unavailable model never replaces the working one.
+        """
+        normalized = model_name.strip()
+        if not normalized:
+            raise ValueError("model_name must not be empty")
+
+        candidate = create_llm_provider(normalized)
+        candidate.warmup()
+        self.model_registry.register(
+            name=normalized,
+            base_model=normalized,
+            stage="ready",
+            artifact=normalized,
+        )
+        self.model_registry.activate(normalized)
+        self.model_name = normalized
+        self.llm = candidate
+        self.planner.llm = candidate
+        return self.model_name
+
+    def model_status(self) -> dict:
+        return {
+            "active_model": self.model_name,
+            "registered_models": self.model_registry.models(),
+        }
 
     def _model_error(self, error: Exception) -> str:
         return (

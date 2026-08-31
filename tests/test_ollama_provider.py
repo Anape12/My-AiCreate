@@ -16,7 +16,7 @@ class OllamaProviderTests(unittest.TestCase):
             keep_alive="30m",
             base_url="http://host.docker.internal:11434",
             num_ctx=4096,
-            num_predict=180,
+            num_predict=512,
             temperature=0.5,
         )
 

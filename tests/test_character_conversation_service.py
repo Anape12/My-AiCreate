@@ -36,7 +36,7 @@ class CharacterConversationServiceTests(unittest.TestCase):
     def test_provider_is_cached_between_responses(self):
         self.respond()
         self.respond("もう少し教えて")
-        self.create_provider.assert_called_once_with("qwen2.5:3b")
+        self.create_provider.assert_called_once_with("qwen2.5:7b")
 
     def test_loads_prompt_for_conversation_type(self):
         self.respond()

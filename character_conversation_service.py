@@ -9,10 +9,12 @@ from prompt_repository import PromptRepository
 class CharacterConversationService:
     """Fast, character-focused conversation path with cached model providers."""
 
-    def __init__(self, registry, prompt_repository=None):
+    def __init__(self, registry, prompt_repository=None, default_model=None):
         self.registry = registry
         self.prompts = prompt_repository or PromptRepository()
-        self.default_model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
+        # Keep the character chat path on the same general-purpose default as
+        # the main AI service unless the caller intentionally selects a model.
+        self.default_model = default_model or os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
         self._providers = {}
         self._locks = {}
         self._cache_lock = threading.Lock()

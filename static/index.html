@@ -47,6 +47,13 @@ body {
   line-height: 1.65;
 }
 
+#modelStatus {
+  padding: 7px 20px;
+  color: #c8c8cf;
+  background: #2d2e38;
+  font-size: 13px;
+}
+
 /* ユーザー */
 .user .bubble {
   background: #0b93f6;
@@ -98,6 +105,8 @@ button {
 <body>
 <div id="container">
 
+  <div id="modelStatus">AIを準備しています…</div>
+
   <div id="chat"></div>
 
   <div id="inputArea">
@@ -110,7 +119,20 @@ button {
 <script>
 let isLoading = false;
 
+async function showModelStatus() {
+  const status = document.getElementById("modelStatus");
+  try {
+    const response = await fetch("http://localhost:8000/models");
+    if (!response.ok) throw new Error("model status unavailable");
+    const data = await response.json();
+    status.textContent = `使用中のAI: ${data.active_model}`;
+  } catch (error) {
+    status.textContent = "AIサーバーに接続中…";
+  }
+}
+
 fetch("http://localhost:8000/models/warmup", {method: "POST"}).catch(() => {});
+showModelStatus();
 
 async function send() {
   if (isLoading) return;
@@ -146,12 +168,14 @@ async function send() {
       const { done, value } = await reader.read();
       if (done) break;
 
-      result += decoder.decode(value);
+      result += decoder.decode(value, {stream: true});
       updateMessage(msgId, result);
 
       const chat = document.getElementById("chat");
       chat.scrollTop = chat.scrollHeight;
     }
+    result += decoder.decode();
+    updateMessage(msgId, result);
     if (experienceId) addFeedback(msgId, experienceId);
 
   } catch (e) {

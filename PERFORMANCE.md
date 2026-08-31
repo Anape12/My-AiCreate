@@ -8,7 +8,7 @@ Before starting the API, use this setting if a different keep-alive period is re
 $env:OLLAMA_KEEP_ALIVE = "30m"
 ```
 
-Use `-1m` only when there is enough memory to keep the model resident until Ollama is restarted.
+Use `-1m` only when there is enough memory to keep the model resident until Ollama is restarted.  (`-1` alone is not a valid Ollama duration.)
 
 ```powershell
 $env:OLLAMA_KEEP_ALIVE = "-1m"

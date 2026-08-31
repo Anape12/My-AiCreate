@@ -17,7 +17,8 @@ class OllamaProvider(LLMProvider):
             self.keep_alive = "-1m"
         self.host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
         self.num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
-        self.num_predict = int(os.getenv("OLLAMA_NUM_PREDICT", "180"))
+        # 180 tokens often cuts off code samples and numbered explanations mid-sentence.
+        self.num_predict = int(os.getenv("OLLAMA_NUM_PREDICT", "512"))
         self.temperature = float(os.getenv("OLLAMA_TEMPERATURE", "0.5"))
         self._client = OllamaLLM(
             model=model_name,

@@ -36,9 +36,13 @@ class ExperienceReviewRequest(BaseModel):
     comment: str = ""
 
 
+class ModelSelectionRequest(BaseModel):
+    model_name: str
+
+
 app = FastAPI()
 ai_service = AIService()
-character_service = CharacterConversationService(ai_service.registry)
+character_service = CharacterConversationService(ai_service.registry, default_model=ai_service.model_name)
 logger = logging.getLogger("uvicorn.error")
 
 
@@ -86,6 +90,25 @@ def warmup_model():
     try:
         ai_service.warmup()
         return {"status": "ready", "model": ai_service.model_name}
+    except Exception as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.get("/models")
+def get_models():
+    """Show the model currently serving requests and locally promoted models."""
+    return ai_service.model_status()
+
+
+@app.post("/models/select")
+def select_model(req: ModelSelectionRequest):
+    """Activate an installed model after a health check; no server restart needed."""
+    try:
+        model = ai_service.select_model(req.model_name)
+        character_service.default_model = model
+        return {"status": "ready", "model": model}
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 

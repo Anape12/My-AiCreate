@@ -64,6 +64,7 @@ class MemoryAndTrainingTests(unittest.TestCase):
             registry.register("candidate", "mistral", "ready", "my-ai:latest")
             registry.activate("candidate")
             self.assertEqual(registry.active_model(), "candidate")
+            self.assertIn("candidate", registry.models())
 
     def test_sourced_knowledge_is_persisted_with_provenance(self):
         with tempfile.TemporaryDirectory() as directory:
