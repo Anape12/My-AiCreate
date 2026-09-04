@@ -42,6 +42,29 @@ class CharacterConversationServiceTests(unittest.TestCase):
         self.respond()
         self.prompts.load.assert_called_once_with("mia", "CHAT")
 
+    def test_prompt_requires_japanese_only_response(self):
+        self.respond()
+        _, user_prompt = self.provider.invoke_chat.call_args.args
+        self.assertIn("最初から最後まで日本語だけ", user_prompt)
+
+    def test_removes_accidental_chinese_continuation(self):
+        self.provider.invoke_chat.return_value = (
+            "電車で懸垂をするおじさん、面白いですね。"
+            "体の柔軟性が羨ましいです。"
+            "今週は普段通りだったけど、そんな小さな発見があったん就好了不起眼的小确幸呢。"
+        )
+        self.assertEqual(
+            "電車で懸垂をするおじさん、面白いですね。体の柔軟性が羨ましいです。",
+            self.respond("電車で懸垂をするおじさんを見た"),
+        )
+
+    def test_replaces_chinese_only_response_without_slow_retry(self):
+        self.provider.invoke_chat.return_value = "周末有什么计划吗？"
+        self.assertEqual(
+            "うまく日本語で答えられませんでした。もう一度聞いてもらえますか？",
+            self.respond(),
+        )
+
     def test_sends_persona_as_system_and_latest_message_as_current_user_message(self):
         self.respond("今日の夜ご飯は焼き鳥で胃もたれした笑")
         system_prompt, user_prompt = self.provider.invoke_chat.call_args.args

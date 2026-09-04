@@ -9,6 +9,10 @@ from prompt_repository import PromptRepository
 class CharacterConversationService:
     """Fast, character-focused conversation path with cached model providers."""
 
+    _CHINESE_CONTAMINATION = re.compile(
+        r"(?:就好|周末|什么|计划|小确幸|有没有|觉得|因为|所以)|[这们吗呢吧没给让觉样开关发应该经过]"
+    )
+
     def __init__(self, registry, prompt_repository=None, default_model=None):
         self.registry = registry
         self.prompts = prompt_repository or PromptRepository()
@@ -75,6 +79,23 @@ class CharacterConversationService:
                 return remainder
         return text
 
+    @classmethod
+    def _enforce_japanese(cls, answer):
+        """Remove an accidental Chinese continuation without another LLM call."""
+        match = cls._CHINESE_CONTAMINATION.search(answer)
+        if not match:
+            return answer
+
+        japanese_prefix = answer[:match.start()].rstrip()
+        last_sentence_end = max(
+            japanese_prefix.rfind("。"),
+            japanese_prefix.rfind("！"),
+            japanese_prefix.rfind("？"),
+        )
+        if last_sentence_end >= 0:
+            return japanese_prefix[:last_sentence_end + 1].strip()
+        return "うまく日本語で答えられませんでした。もう一度聞いてもらえますか？"
+
     def respond(self, *, character_name, prompt_key, model_name,
                 conversation_type, context, message):
         _, provider, lock = self._provider(model_name)
@@ -95,8 +116,11 @@ class CharacterConversationService:
 {tool_context or 'なし'}
 </tool_result>
 
-今回の発言にかみ合う「{character_name}」の返答本文だけを出力してください。"""
+今回の発言にかみ合う「{character_name}」の返答本文だけを出力してください。
+返答は最初から最後まで日本語だけで書き、中国語など他言語の文章を混ぜないでください。
+固有名詞やコードを除き、日本語以外へ言語を切り替えないでください。"""
         # Ollama clients are reused; serialize calls per model to keep local inference stable.
         with lock:
             answer = provider.invoke_chat(character_prompt, user_prompt)
-        return self._naturalize_answer(answer, character_name, message)
+        answer = self._naturalize_answer(answer, character_name, message)
+        return self._enforce_japanese(answer)
